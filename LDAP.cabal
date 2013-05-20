@@ -1,0 +1,12 @@
+name:           LDAP
+version:        0.0
+synopsis:       Simple LDAP server
+author:         Lukasz Piatkowski, Szymon Starzycki, Michał Szczepaniak
+license:        AllRightsReserved
+build-type:     Simple
+cabal-version:  >= 1.2
+
+executable ldap-server
+  main-is:        src/main.hs
+  hs-source-dirs: ., src/Encoding
+  build-depends:   base >= 3, mtl >= 2, containers, array, utf8-string >= 0.3.7
