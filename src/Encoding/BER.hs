@@ -12,9 +12,10 @@ data BERTree = Sequence { berSequence :: [BERTree] } |
                   IntNode { intValue :: Int } |
                   BoolNode { boolValue :: Bool } |
                   Enumerated { enumeratedValue :: Int } |
-                  ChoiceNode { choiceValue :: Int, subtree :: BERTree } |
+                  ChoiceNode { choiceValue :: Int, subtree :: [BERTree] } |
                   ContextNode { contextTag :: Int, contextValue :: [Word8] } |
-                  RawData { rawValue :: BERMessage , rawPCValue :: BERPC, rawTagValue :: Int }
+                  RawData { rawValue :: BERMessage , rawPCValue :: BERPC, rawTagValue :: Int } |
+                  EOFNode
                   deriving (Eq, Ord, Show)
 
 
@@ -67,7 +68,9 @@ getHeaderSize :: BERMessage -> Int
 getHeaderSize dat = if hasExtendedSize dat then 3 else 2
 
 -- Returns length of content without header
-getLength dat = if hasExtendedSize dat then getExtendedSize dat else getNormalSize dat
+getLength dat = if (getClass dat) == Universal && getTag dat == 0
+                then (-1)
+                else if hasExtendedSize dat then getExtendedSize dat else getNormalSize dat
 
 -- Returns message class
 getClass :: BERMessage -> BERClass
@@ -98,12 +101,20 @@ buildTree mes = buildSubTree mes' pc cl tag
         cl = getClass mes
         tag = getTag mes
 
+buildTreeSequence :: [Word8] -> [BERTree]
+buildTreeSequence [] = []
+buildTreeSequence dat = if len <= (length dat) then (buildTree mes):(buildTreeSequence $ drop len dat) else []
+    where
+        mes = BERData dat
+        len = getLength mes + getHeaderSize mes
+
 messageToInt :: BERMessage -> Int
 messageToInt mess = messageToInt' (berData mess)
     where
         messageToInt' dat = foldr (\v -> \acc -> acc * 2 ^ 8 + (word8ToInt v)) 0 dat
 
 buildSubTree :: BERMessage -> BERPC -> BERClass -> Int -> BERTree
+buildSubTree mes pc Universal 0 = EOFNode
 buildSubTree mes pc Universal 1 = BoolNode $ (messageToInt mes) > 0
 buildSubTree mes pc Universal 2 = IntNode $ (messageToInt mes)
 buildSubTree mes pc Universal 4 = OctetString $ berData mes
@@ -118,8 +129,10 @@ buildSubTree mes pc Universal 16 = if len > length (berData mes)
         len = (getLength mes) + (getHeaderSize mes)
         mes' = BERData $ drop (len) $ berData mes
 
-buildSubTree mes pc ContextSpecific tag = ContextNode tag $ berData mes
+buildSubTree mes Constructed ContextSpecific tag = ChoiceNode tag $ buildTreeSequence $ berData mes
+buildSubTree mes Primitive ContextSpecific tag = ContextNode tag $ berData mes
 
+buildSubTree mes Constructed Application tag = ChoiceNode tag $ buildTreeSequence $ berData mes
 buildSubTree mes pc Application tag = RawData mes pc tag
 -- buildSubTree mes pc Application _ = buildSubTree mes pc Universal 16
 -- should be
