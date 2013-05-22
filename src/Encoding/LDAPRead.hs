@@ -86,17 +86,23 @@ buildString :: BERTree -> ParseT String
 buildString (OctetString str) = return $ Codec.decode str
 buildString arg = fail $ "Expected string type got " ++ show arg
 
-encodeString :: [Word8] -> ParseT String
-encodeString str = return $ Codec.decode str
+decodeString :: [Word8] -> ParseT String
+decodeString str = return $ Codec.decode str
 
 buildFilter :: BERTree -> ParseT Filter
 buildFilter (ContextNode 0 rawData) = do
-    filters <- forM (buildTreeSequence rawData) buildFilter
-    return $ And filters
+    case buildTree $ BERData rawData of
+        (SetOf dat) -> do
+            filters <- forM (dat) buildFilter
+            return $ And filters
+        _ -> fail "Got unexpected type instead AND set"
 
 buildFilter (ContextNode 1 rawData) = do
-    filters <- forM (buildTreeSequence rawData) buildFilter
-    return $ Or filters
+    case buildTree $ BERData rawData of
+        (SetOf dat) -> do
+            filters <- forM dat buildFilter
+            return $ Or filters
+        _ -> fail "Got unexpected type instead OR set"
 
 buildFilter (ContextNode 2 subtree) = do
     filter <- buildFilter $ buildTree $ BERData subtree
@@ -119,7 +125,7 @@ buildFilter (ContextNode 6 subtree) = do
     return $ LessOrEqual attr
 
 buildFilter (ContextNode 7 subtree) = do
-    attr <- encodeString subtree
+    attr <- decodeString subtree
     return $ Present attr
 
 buildFilter (ContextNode 8 subtree) = do
@@ -211,7 +217,7 @@ buildModifyChanges' (Sequence (op:modif:[])) = do
 buildModifyChanges' _ = fail "Expected modify change"
     
 buildPartialAttribute :: BERTree -> ParseT PartialAttribute
-buildPartialAttribute (Sequence (typ:(Sequence vals):[])) = do
+buildPartialAttribute (Sequence (typ:(SetOf vals):[])) = do
     attrType <- buildString typ
     attrValues <- forM vals buildString
     return (attrType, attrValues)
@@ -223,3 +229,4 @@ buildAttributes :: BERTree -> ParseT AttributeList
 buildAttributes (Sequence attributes) = forM attributes buildPartialAttribute
 
 buildAttributes _ = fail "Expected partial attribute"
+

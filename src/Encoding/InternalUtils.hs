@@ -8,3 +8,7 @@ foldrHead f acc (x:xs) num = foldrHead f (f x acc) xs (num - 1)
 
 word8ToInt :: Word8 -> Int
 word8ToInt = fromIntegral . toInteger
+intToWord8 :: Int -> Word8
+intToWord8 = fromIntegral . toInteger
+charToWord8 :: Char -> Word8
+charToWord8 = toEnum . fromEnum

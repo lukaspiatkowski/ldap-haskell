@@ -5,8 +5,8 @@ import InternalUtils
 
 
 newtype BERMessage = BERData { berData :: [Word8] } deriving (Eq, Ord, Show)
-data BERClass = Universal | Application | ContextSpecific | Private deriving (Eq, Ord, Show)
-data BERPC = Primitive | Constructed deriving (Eq, Ord, Show)
+data BERClass = Universal | Application | ContextSpecific | Private deriving (Eq, Ord, Show, Enum)
+data BERPC = Primitive | Constructed deriving (Eq, Ord, Show, Enum)
 data BERTree = Sequence { berSequence :: [BERTree] } |
                   OctetString { berString :: [Word8] } |
                   IntNode { intValue :: Int } |
@@ -15,7 +15,9 @@ data BERTree = Sequence { berSequence :: [BERTree] } |
                   ChoiceNode { choiceValue :: Int, subtree :: [BERTree] } |
                   ContextNode { contextTag :: Int, contextValue :: [Word8] } |
                   RawData { rawValue :: BERMessage , rawPCValue :: BERPC, rawTagValue :: Int } |
-                  EOFNode
+                  EOFNode |
+                  SetOf {berSet :: [BERTree] } |
+                  ApplicationSpecific { tag :: Int, appSequence :: [BERTree] }
                   deriving (Eq, Ord, Show)
 
 
@@ -119,13 +121,21 @@ buildSubTree mes pc Universal 1 = BoolNode $ (messageToInt mes) > 0
 buildSubTree mes pc Universal 2 = IntNode $ (messageToInt mes)
 buildSubTree mes pc Universal 4 = OctetString $ berData mes
 buildSubTree mes pc Universal 10 = Enumerated $ (messageToInt mes)
-buildSubTree mes pc Universal 17 = buildSubTree mes pc Universal 16
 buildSubTree (BERData []) pc Universal 16 = Sequence []
 buildSubTree mes pc Universal 16 = if len > length (berData mes)
                                        then error "Transmission error, length is inappopriate"
                                        else Sequence $ (buildTree mes):(berSequence sequence)
     where
         sequence = buildSubTree mes' pc Universal 16
+        len = (getLength mes) + (getHeaderSize mes)
+        mes' = BERData $ drop (len) $ berData mes
+
+buildSubTree (BERData []) pc Universal 17 = SetOf []
+buildSubTree mes pc Universal 17 = if len > length (berData mes)
+                                       then error "Transmission error, length is inappopriate"
+                                       else SetOf $ (buildTree mes):(berSet sequence)
+    where
+        sequence = buildSubTree mes' pc Universal 17
         len = (getLength mes) + (getHeaderSize mes)
         mes' = BERData $ drop (len) $ berData mes
 
@@ -139,5 +149,44 @@ buildSubTree mes pc Application tag = RawData mes pc tag
 
 buildSubTree _ _ t tag = error $ "Error: This should not appear. Try to add new message types" ++ show t ++ " " ++ show tag ++ "\n"
 
+
+-- WRITE BER
+
+writeData :: BERClass -> BERPC -> Int -> [Word8] -> [Word8]
+writeData clas pc tag dat = writeHeader clas pc tag : writeLength (length dat) ++ dat
+
+writeHeader :: BERClass -> BERPC -> Int -> Word8
+writeHeader cl pc tag =
+    ((intToWord8 $ fromEnum cl .&. 3) `shift` 6) .|.
+    ((intToWord8 $ fromEnum pc .&. 1) `shift` 5) .|.
+    ((intToWord8 tag .&. 31))
+
+writeLength :: Int -> [Word8]
+writeLength len =
+    if len < 2^7
+        then [intToWord8 len]
+        else ((intToWord8 $ length extLength ) .|. (2^7) ):extLength
+    where
+        extLength = writeInt len
+
+writeInt :: Int -> [Word8]
+writeInt 0 = []
+writeInt len = writeInt (div len (2^8)) ++ [intToWord8 len]
+
+writeTree (Sequence berSequence) = writeData Universal Constructed 16 (writeTreeSequence berSequence)
+writeTree (SetOf berSequence) = writeData Universal Constructed 17 (writeTreeSequence berSequence)
+writeTree (ApplicationSpecific tag seq) = writeData Application Constructed tag (writeTreeSequence seq)
+writeTree (OctetString str) = writeData Universal Primitive 4 str
+writeTree (IntNode int) = writeData Universal Primitive 2 (writeInt int)
+writeTree (BoolNode int) = writeData Universal Primitive 2 (writeInt $ fromEnum int)
+writeTree (Enumerated int) = writeData Universal Primitive 10 (writeInt int)
+writeTree (ChoiceNode tag val) = writeData Universal Constructed tag (writeTreeSequence val)
+writeTree (ContextNode tag val) = writeData ContextSpecific pc tag val
+    where
+        pc = if length val > 0 then Constructed else Primitive
+writeTree (RawData val pc tag) = writeData Application pc tag (berData val)
+
+writeTreeSequence :: [BERTree] -> [Word8]
+writeTreeSequence = concat . map writeTree
 
 
