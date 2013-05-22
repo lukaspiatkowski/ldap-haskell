@@ -170,8 +170,12 @@ writeLength len =
         extLength = writeInt len
 
 writeInt :: Int -> [Word8]
-writeInt 0 = []
-writeInt len = writeInt (div len (2^8)) ++ [intToWord8 len]
+writeInt 0 = [0]
+writeInt len = writeInt' len
+
+writeInt' :: Int -> [Word8]
+writeInt' 0 = []
+writeInt' len = writeInt' (div len (2^8)) ++ [intToWord8 len]
 
 writeTree (Sequence berSequence) = writeData Universal Constructed 16 (writeTreeSequence berSequence)
 writeTree (SetOf berSequence) = writeData Universal Constructed 17 (writeTreeSequence berSequence)

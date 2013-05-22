@@ -15,10 +15,10 @@ writeLDAP (id, op, controls) = Sequence ((IntNode id):(writeOperation op):(write
 
 writeOperation :: ProtocolOp -> BERTree
 writeOperation (BindResponse result (Just creds)) =
-    ApplicationSpecific 1 $ [Sequence $ (writeResult result):(ContextNode 7 $ map intToWord8 creds):[]]
+    ApplicationSpecific 1 $ (berSequence $ writeResult result) ++ (ContextNode 7 $ map intToWord8 creds):[]
 
 writeOperation (BindResponse result Nothing) =
-    ApplicationSpecific 1 $ [Sequence [(writeResult result)]]
+    writeResultResp 1 result
 
 writeOperation (SearchResultEntry dn partialAttrs) =
     ApplicationSpecific 5 [writeString dn, Sequence $ map writePartialAttr partialAttrs]
