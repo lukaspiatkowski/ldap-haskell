@@ -1,6 +1,6 @@
-module LDAPRead where
-import BER
-import LDAPDefs
+module Encoding.LDAPRead where
+import Encoding.BER
+import Encoding.LDAPDefs
 import Control.Monad.Error
 import qualified Codec.Binary.UTF8.String as Codec
 import Data.Word

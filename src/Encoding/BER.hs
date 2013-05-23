@@ -1,7 +1,7 @@
-module BER where
+module Encoding.BER where
 import Data.Bits
 import Data.Word
-import InternalUtils
+import Encoding.InternalUtils
 
 
 newtype BERMessage = BERData { berData :: [Word8] } deriving (Eq, Ord, Show)

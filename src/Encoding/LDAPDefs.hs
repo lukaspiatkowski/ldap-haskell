@@ -1,4 +1,4 @@
-module LDAPDefs where
+module Encoding.LDAPDefs where
 
 import Data.Word as Word
 

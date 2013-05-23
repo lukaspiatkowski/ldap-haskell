@@ -1,4 +1,4 @@
-module InternalUtils where
+module Encoding.InternalUtils where
 import Data.Word
 
 foldrHead :: (a -> b -> b) -> b -> [a] -> Int -> b

@@ -1,8 +1,8 @@
-module LDAPWrite where
+module Encoding.LDAPWrite where
 
-import InternalUtils
-import BER
-import LDAPDefs
+import Encoding.InternalUtils
+import Encoding.BER
+import Encoding.LDAPDefs
 import Data.Word
 import qualified Codec.Binary.UTF8.String as Codec
 
