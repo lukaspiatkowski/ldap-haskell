@@ -104,32 +104,32 @@ buildFilter (ContextNode 1 rawData) = do
             return $ Or filters
         _ -> Left "Got unexpected type instead OR set"
 
-buildFilter (ContextNode 2 subtree) = do
-    filter <- buildFilter $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 2 (subtree:[])) = do
+    filter <- buildFilter subtree
     return $ Not filter
 
-buildFilter (ContextNode 3 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData  subtree
+buildFilter (ChoiceNode 3 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ EqualityMatch attr
 
-buildFilter (ContextNode 4 subtree) = do
-    substrF <- buildSubstrFilter $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 4 (subtree:[])) = do
+    substrF <- buildSubstrFilter subtree
     return $ SubstringsF substrF
 
-buildFilter (ContextNode 5 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 5 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ GreaterOrEqual attr
 
-buildFilter (ContextNode 6 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 6 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ LessOrEqual attr
 
 buildFilter (ContextNode 7 subtree) = do
     attr <- decodeString subtree
     return $ Present attr
 
-buildFilter (ContextNode 8 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 8 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ ApproxMatch attr
 
 -- TODO
