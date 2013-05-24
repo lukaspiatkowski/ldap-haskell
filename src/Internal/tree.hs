@@ -5,16 +5,23 @@ module Internal.Tree where
 import Control.Monad.Cont
 import Data.List
 
-data Tree a = Tree a [Tree a] deriving (Eq, Show)
+data Tree a = Root [Tree a] | Tree a [Tree a] deriving (Eq, Show)
+data Scope = Base | One | Subtree deriving (Eq, Show)
 
-foldAll :: (a -> b -> a) -> a -> Tree b -> a
-foldAll f z (Tree v ts) = foldl (foldAll f) (f z v) ts
+foldSubtree :: (a -> b -> a) -> a -> Tree b -> a
+foldSubtree f z (Tree v ts) = foldl (foldSubtree f) (f z v) ts
+
+foldBase :: (a -> b -> a) -> a -> Tree b -> a
+foldBase f z (Tree v _) = f z v
 
 foldOne :: (a -> b -> a) -> a -> Tree b -> a
-foldOne f z (Tree v _) = f z v
+foldOne f z (Tree _ ts) = foldl (foldBase f) z ts
 
-foldChildren :: (a -> b -> a) -> a -> Tree b -> a
-foldChildren f z (Tree _ ts) = foldl (foldOne f) z ts
+chooseFold :: Scope -> (a -> b -> a) -> a -> Tree b -> a
+chooseFold scope = case scope of
+  Base -> foldBase
+  One -> foldOne
+  Subtree -> foldSubtree
 
 type CompTree a = forall b. Cont (Bool -> (Maybe (Tree b))) a
 
@@ -26,29 +33,59 @@ instance MonadState s (Cont (s -> r)) where
   get = cont (\asr s -> asr s s)
   put s = cont (\asr _ -> asr () s)
 
-travers :: Eq a => (Maybe (Tree a) -> a -> (Maybe (Tree a))) ->
-  Maybe (Tree a) -> [a] -> Maybe (Tree a)
-travers f Nothing (a:as) = case f Nothing a of
-  Nothing -> Nothing
-  Just (Tree v ts) -> Just $ Tree v $ traversChildren (f . Just) ts as
-travers f (Just tree) as = traversT (f . Just) tree as
+changeChildren :: ([Tree a] -> [Tree a]) -> Tree a -> Tree a
+changeChildren f t = case t of
+  Root ts -> Root $ f ts
+  Tree v ts -> Tree v $ f ts
 
-traversT :: Eq a => (Tree a -> a -> Maybe (Tree a)) ->
-  Tree a -> [a] -> Maybe (Tree a)
-traversT f tree [] = Just tree
-traversT f tree (a:as) = case f tree a of
-  Nothing -> Nothing
-  Just (Tree v ts) -> Just $ Tree v $ traversChildren f ts as
+unJust :: Maybe a -> a
+unJust (Just a) = a
 
-traversChildren :: Eq a => (Tree a -> a -> Maybe (Tree a)) ->
-  [Tree a] -> [a] -> [Tree a]
-traversChildren f ts as =
-  case sequence $ filter (/= Nothing) $ (map $ (flip $ traversT f) as) ts of
-    Nothing -> []
-    Just l -> l
+unMaybeList :: Eq a => [Maybe a] -> [a]
+unMaybeList = unJust . sequence . filter (/= Nothing)
 
-add :: Eq a => Maybe (Tree a) -> [a] -> Maybe (Tree a)
-add = undefined
+selectMap :: Eq a => (a -> Maybe a) -> (a -> Bool) -> [a] -> [a]
+selectMap f p = unMaybeList . map (\a -> if p a then f a else Just a)
 
-remove :: Eq a => Tree a -> [a] -> Maybe (Tree a)
-remove = undefined
+match :: Eq a => a -> Tree a -> Bool
+match a (Tree v _) = v == a
+
+getChildren :: Tree a -> [Tree a]
+getChildren t = case t of
+  Root ts -> ts
+  Tree _ ts -> ts
+
+add :: Eq a => [a] -> Tree a -> Tree a
+add as = let
+    addList [] ts = ts
+    addList (ax:as) ts = if any (\(Tree v _) -> v == ax) ts then
+      selectMap (Just . add as) (match ax) ts else
+      ((Tree ax $ addList as []):ts)
+  in case as of
+    [] -> id
+    _ -> changeChildren (addList as)
+
+findAndChange :: Eq a => (Tree a -> Maybe (Tree a)) -> [a] ->
+  Tree a -> Maybe (Tree a)
+findAndChange f [] t = f t
+findAndChange f (ax:as) t = let
+    xTs = selectMap (findAndChange f as) (match ax)
+  in Just $ case t of
+    Root ts -> Root $ xTs ts
+    Tree v ts -> Tree v $ xTs ts
+
+remove :: Eq a => [a] -> Tree a -> Tree a
+remove (ax:as) = unJust . findAndChange (\_ -> Nothing) (ax:as)
+
+modify :: Eq a => [a] -> a -> Tree a -> Tree a
+modify (ax:as) a =
+  unJust . findAndChange (\(Tree _ ts) -> Just $ Tree a ts) (ax:as)
+
+search :: Eq a => [a] -> (a -> Bool) -> Scope -> Tree a -> [a]
+search [] p scope t =
+  (chooseFold scope) (\acc v -> if p v then (v:acc) else acc) [] t
+search (ax:as) p scope t = searchList (ax:as) p scope $ getChildren t
+  where
+    searchList (ax:as) p scope ts = case find (match ax) ts of
+      Nothing -> []
+      Just t -> search as p scope t
