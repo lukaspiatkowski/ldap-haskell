@@ -109,7 +109,7 @@ type Controls = [Control]
 
 type Control = (LDAPOID, Bool, (Maybe [Int]))
 
-data AuthenticationChoice = Simple [Word.Word8] | Sasl SaslCredentials deriving (Show)
+data AuthenticationChoice = Simple String | Sasl SaslCredentials deriving (Show)
 
 type SaslCredentials = (String, (Maybe [Word8]))
 
