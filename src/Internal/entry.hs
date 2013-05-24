@@ -1,4 +1,4 @@
-module Entry where
+module Internal.Entry where
 
 import Data.Char
 import Data.List

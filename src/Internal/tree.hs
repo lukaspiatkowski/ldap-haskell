@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses,
   FunctionalDependencies, RankNTypes #-}
-module Tree where
+module Internal.Tree where
 
 import Control.Monad.Cont
 import Data.List
