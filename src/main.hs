@@ -10,7 +10,9 @@ import Encoding.LDAPRead
 
 readMessage handle msg =
     case sizeLeft msg of
-        Nothing -> do return $ buildTree msg
+        Nothing -> do
+            print $ berData msg
+            return $ buildTree msg
         Just x -> do
             msg_data <- DBS.hGet handle x
             real_message <-readMessage handle (BERData $ (berData msg) ++ (DBS.unpack msg_data))
@@ -21,7 +23,8 @@ loop socket = do
     --na razie tylko wypisujaemy ber na wyjście
     intermediate_msg <- readMessage handle newMessage
     --buildLDAP intermediate_msg
-    System.IO.putStrLn $ show $ buildLDAP intermediate_msg
+    print $ show intermediate_msg
+    print $ show $ buildLDAP intermediate_msg
     loop socket
 
 main = withSocketsDo $ do

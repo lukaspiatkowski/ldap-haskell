@@ -13,16 +13,16 @@ buildLDAP (Sequence ((IntNode num):dat:controls)) = do
     controls <- buildControls controls
     return (num, op, controls)
     
-buildLDAP _ = fail "Error: Wrong type of message" 
+buildLDAP _ = Left "Error: Wrong type of message" 
 
 buildControls [] = return Nothing
-buildControls controls = fail "Controls not supported"
+buildControls controls = Left "Controls not supported"
 
 buildProtocolOp :: BERTree -> ParseT ProtocolOp 
 buildProtocolOp (ChoiceNode tag val) = buildProtocolOp' tag $ Sequence $ val
 buildProtocolOp (RawData val pc tag) = buildProtocolOp' tag $ RawData val pc tag
 
-buildProtocolOp _ = fail "Error: Wrong type of message"
+buildProtocolOp _ = Left "Error: Wrong type of message"
 
 
 buildProtocolOp' :: Int -> BERTree -> ParseT ProtocolOp 
@@ -68,23 +68,23 @@ buildProtocolOp' 10 (Sequence (obj:[])) = do
 
 --buildProtocolOp' 0 (Sequence )= 
 
-buildProtocolOp' op typ = fail $ "Operation " ++ show op ++ " not supported or wrong type" ++ show typ
+buildProtocolOp' op typ = Left $ "Operation " ++ show op ++ " not supported or wrong type" ++ show typ
 
 buildInt :: BERTree -> ParseT Int
 buildInt (IntNode i)= return i
-buildInt _ = fail "Expected int type"
+buildInt _ = Left "Expected int type"
 
 buildBool :: BERTree -> ParseT Bool
 buildBool (BoolNode b) = return b
-buildBool _ = fail "Expected bool type"
+buildBool _ = Left "Expected bool type"
 
 buildEnumerate :: BERTree -> ParseT Int
 buildEnumerate (Enumerated e) = return e
-buildEnumerate _ = fail "Expected enumerate type"
+buildEnumerate _ = Left "Expected enumerate type"
 
 buildString :: BERTree -> ParseT String
 buildString (OctetString str) = return $ Codec.decode str
-buildString arg = fail $ "Expected string type got " ++ show arg
+buildString arg = Left $ "Expected string type got " ++ show arg
 
 decodeString :: [Word8] -> ParseT String
 decodeString str = return $ Codec.decode str
@@ -95,41 +95,41 @@ buildFilter (ContextNode 0 rawData) = do
         (SetOf dat) -> do
             filters <- forM (dat) buildFilter
             return $ And filters
-        _ -> fail "Got unexpected type instead AND set"
+        _ -> Left "Got unexpected type instead AND set"
 
 buildFilter (ContextNode 1 rawData) = do
     case buildTree $ BERData rawData of
         (SetOf dat) -> do
             filters <- forM dat buildFilter
             return $ Or filters
-        _ -> fail "Got unexpected type instead OR set"
+        _ -> Left "Got unexpected type instead OR set"
 
-buildFilter (ContextNode 2 subtree) = do
-    filter <- buildFilter $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 2 (subtree:[])) = do
+    filter <- buildFilter subtree
     return $ Not filter
 
-buildFilter (ContextNode 3 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData  subtree
+buildFilter (ChoiceNode 3 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ EqualityMatch attr
 
-buildFilter (ContextNode 4 subtree) = do
-    substrF <- buildSubstrFilter $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 4 (subtree:[])) = do
+    substrF <- buildSubstrFilter subtree
     return $ SubstringsF substrF
 
-buildFilter (ContextNode 5 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 5 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ GreaterOrEqual attr
 
-buildFilter (ContextNode 6 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 6 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ LessOrEqual attr
 
 buildFilter (ContextNode 7 subtree) = do
     attr <- decodeString subtree
     return $ Present attr
 
-buildFilter (ContextNode 8 subtree) = do
-    attr <- buildAttrValAssert $ buildTree $ BERData subtree
+buildFilter (ChoiceNode 8 (subtree:[])) = do
+    attr <- buildAttrValAssert subtree
     return $ ApproxMatch attr
 
 -- TODO
@@ -137,7 +137,7 @@ buildFilter (ContextNode 8 subtree) = do
 --    attr <- buildMatchRuleAssert subtree
 --    return $ ExtensibleMatch attr
 
-buildFilter _ = fail "Expected filter choice"
+buildFilter _ = Left "Expected filter choice"
 
 
 buildAttrValAssert :: BERTree -> ParseT AttributeValueAssertion
@@ -147,7 +147,7 @@ buildAttrValAssert (Sequence (descr:assertVal:[])) = do
     return (description, assertionValue)
 
 
-buildAttrValAssert _ = fail "Expected Attribute Value Assertion" 
+buildAttrValAssert _ = Left "Expected Attribute Value Assertion" 
 
 buildSubstrFilter :: BERTree -> ParseT SubstringFilter
 buildSubstrFilter (Sequence (desc:substr)) = do
@@ -155,39 +155,40 @@ buildSubstrFilter (Sequence (desc:substr)) = do
     substrings <- forM substr buildSubstring
     return (descr, substrings)
 
-buildSubstrFilter _ = fail "Expected Substring Filter Value" 
+buildSubstrFilter _ = Left "Expected Substring Filter Value" 
 
 
 buildSubstring :: BERTree -> ParseT Substrings
-buildSubstring (ChoiceNode 0 (str:[])) = do
-    substring <- buildString str
+buildSubstring (ContextNode 0 str) = do
+    substring <- decodeString str
     return $ Initial substring
 
-buildSubstring (ChoiceNode 1 (str:[])) = do
-    substring <- buildString str
+buildSubstring (ContextNode 1 str) = do
+    substring <- decodeString str
     return $ Any substring
 
-buildSubstring (ChoiceNode 2 (str:[])) = do
-    substring <- buildString str
+buildSubstring (ContextNode 2 str) = do
+    substring <- decodeString str
     return $ Final substring
 
-buildSubstring _ = fail "Expected Substring Value " 
+buildSubstring _ = Left "Expected Substring Value " 
 
 --buildMatchRuleAssert :: BERTree -> ParseT MatchingRuleAssertion
 
 buildAttrSelect :: BERTree -> ParseT AttributeDescriptionList
 buildAttrSelect (Sequence tree) = forM tree buildString
-buildAttrSelect _ = fail "Expected Substring Value " 
+buildAttrSelect _ = Left "Expected Substring Value " 
 
 buildAuthentication :: BERTree -> ParseT AuthenticationChoice
-buildAuthentication (ChoiceNode 0 ((OctetString str):[])) = do
+buildAuthentication (ContextNode 0 value) = do
+    str <- decodeString value
     return $ Simple str
 
 buildAuthentication (ChoiceNode 1 (subtree:[])) = do
     val <- buildSaslCredentials subtree
     return $ Sasl val
 
-buildAuthentication _ = fail "Expected Authentication Value " 
+buildAuthentication _ = Left "Expected Authentication Value " 
 
 buildSaslCredentials :: BERTree -> ParseT SaslCredentials
 buildSaslCredentials (Sequence (str:(OctetString octet):[])) = do 
@@ -198,7 +199,7 @@ buildSaslCredentials (Sequence (str:[])) = do
     mechanism <- buildString str
     return (mechanism, Nothing)
 
-buildSaslCredentials _ = fail "Expected Sasl Credentials" 
+buildSaslCredentials _ = Left "Expected Sasl Credentials" 
 
 buildAttributeDescrList :: BERTree -> ParseT AttributeDescriptionList
 buildAttributeDescrList (Sequence attr) = forM attr buildString
@@ -206,7 +207,7 @@ buildAttributeDescrList (Sequence attr) = forM attr buildString
 buildModifyChanges :: BERTree -> ParseT [(Operation, PartialAttribute)]
 buildModifyChanges (Sequence xs) = forM xs buildModifyChanges'
 
-buildModifyChanges _ = fail "Expected modify changes"
+buildModifyChanges _ = Left "Expected modify changes"
 
 buildModifyChanges' :: BERTree -> ParseT (Operation, PartialAttribute)
 buildModifyChanges' (Sequence (op:modif:[])) = do
@@ -214,7 +215,7 @@ buildModifyChanges' (Sequence (op:modif:[])) = do
     modification <- buildPartialAttribute modif
     return (operation, modification)
 
-buildModifyChanges' _ = fail "Expected modify change"
+buildModifyChanges' _ = Left "Expected modify change"
     
 buildPartialAttribute :: BERTree -> ParseT PartialAttribute
 buildPartialAttribute (Sequence (typ:(SetOf vals):[])) = do
@@ -222,11 +223,11 @@ buildPartialAttribute (Sequence (typ:(SetOf vals):[])) = do
     attrValues <- forM vals buildString
     return (attrType, attrValues)
 
-buildPartialAttribute _ = fail "Expected partial attribute"
+buildPartialAttribute _ = Left "Expected partial attribute"
 
 buildAttributes :: BERTree -> ParseT AttributeList
 
 buildAttributes (Sequence attributes) = forM attributes buildPartialAttribute
 
-buildAttributes _ = fail "Expected partial attribute"
+buildAttributes _ = Left "Expected partial attribute"
 

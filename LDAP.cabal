@@ -8,5 +8,5 @@ cabal-version:  >= 1.2
 
 executable ldap-server
   main-is:        src/main.hs
-  hs-source-dirs: ., src/Encoding
-  build-depends:   base >= 3, mtl >= 2, containers, array, utf8-string >= 0.3.7
+  hs-source-dirs: ., src/, src/Encoding, src/Internal
+  build-depends:   base >= 3, mtl >= 2, containers, array, utf8-string >= 0.3.7, bytestring >= 0.10.0.2, network >= 2.4.0.1
