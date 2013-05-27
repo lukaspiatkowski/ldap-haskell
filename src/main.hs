@@ -90,11 +90,11 @@ data Flag = ListenPort Int
           | Help
           deriving (Show, Eq, Ord)
 
-listenPort :: Maybe String -> Flag
-listenPort = ListenPort . read . fromMaybe "5002"
+listenPort :: String -> Flag
+listenPort = ListenPort . read
 
 flags = [
-         Option ['p'] [] (OptArg listenPort "PORT" )
+         Option ['p'] [] (ReqArg listenPort "PORT" )
            "Set the port number(defult is 5002)"
         ,Option ['h'] ["help"] (NoArg Help)
            "Print this help message"
@@ -109,7 +109,7 @@ parse argv = case getOpt Permute flags argv of
                (_, _, errs) -> do
                      hPutStrLn stderr (concat errs ++ usageInfo header flags)
                      exitWith (ExitFailure 1)
-             where header = "Usage ldap_srv [-pPORT] [-h]"
+             where header = "Usage ldap_srv [-p PORT] [-h]"
 
 getPort :: [Flag] -> Int
 getPort l = case l of
