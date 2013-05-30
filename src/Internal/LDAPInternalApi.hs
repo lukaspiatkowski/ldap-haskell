@@ -37,4 +37,9 @@ modify = undefined
 
 search :: LDAPDN -> SearchScope -> (AttributeList -> Bool)
   -> LDAPInternalState [(LDAPDN, AttributeList)]
-search = undefined
+search dn scope p = let
+    dnPredicates = dnListToFunctions $ reverse $ ldapDnToList dn
+  in do
+    forest <- get
+    return $ map entryPathToString $
+      Tree.search dnPredicates (attributesPredicate p) scope forest

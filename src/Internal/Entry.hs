@@ -17,8 +17,8 @@ mAV value (_, vs) = any (value==) vs
 getRDN :: Entry -> Maybe Attribute
 getRDN (Entry rdnKey attrs) = find (mAK rdnKey) attrs
 
-getAttribute :: Entry -> String -> Maybe Attribute
-getAttribute (Entry _ attrs) key = find (mAK key) attrs
+getAttribute :: String -> AttributeList -> String
+getAttribute key attrs = case find (mAK key) attrs of Just (_, value:_) -> value
 
 ldapDnToList :: LDAPDN -> [(String, String)]
 ldapDnToList = map (toPairOn '=') . splitOn ',' where
@@ -41,8 +41,17 @@ createEntry (rdn, value) attrs = let
       (rdn, [value]):attrs
   in Entry rdn newAttrs
 
+entryPathToString :: [Entry] -> (LDAPDN, AttributeList)
+entryPathToString entries =
+  (concat $ intersperse "," $ map entryRdnToString entries,
+  case entries of (Entry _ attrs:_) -> attrs) where
+    entryRdnToString (Entry rdn attrs) = rdn ++ ('=':(getAttribute rdn attrs))
+
 rdnPredicate :: String -> (String -> Bool) -> Entry -> Bool
 rdnPredicate rdn p (Entry eRdn attrs) = rdn == eRdn &&
   case find (mAK rdn) attrs of
     Just (_, vs) -> all p vs
     Nothing -> False
+
+attributesPredicate :: (AttributeList -> Bool) -> Entry -> Bool
+attributesPredicate p (Entry _ attrs) = p attrs

@@ -6,21 +6,6 @@ import Data.List
 import Data.Tree
 import Encoding.LDAPDefs
 
-foldSubtree :: (a -> b -> a) -> a -> Tree b -> a
-foldSubtree f z (Node v ts) = foldl (foldSubtree f) (f z v) ts
-
-foldBase :: (a -> b -> a) -> a -> Tree b -> a
-foldBase f z  = (f z) . rootLabel
-
-foldOne :: (a -> b -> a) -> a -> Tree b -> a
-foldOne f z = foldl (foldBase f) z . subForest
-
-chooseFold :: SearchScope -> (a -> b -> a) -> a -> Tree b -> a
-chooseFold scope = case scope of
-  BaseObject -> foldBase
-  SingleLevel -> foldOne
-  WholeSubtree -> foldSubtree
-
 matchingMap :: (a -> Bool) -> (a -> a) -> [a] -> [a]
 matchingMap p f = map (\a -> if p a then f a else a)
 
@@ -34,14 +19,25 @@ remove [fx] = filter (not . fx . rootLabel)
 remove (fx:fs) =
   matchingMap (fx . rootLabel) (\(Node v ts) -> Node v $ remove fs ts)
 
-search :: [a -> Bool] -> (a -> Bool) -> SearchScope -> Forest a -> [a]
-search [fx] p scope frst = case find (fx . rootLabel) frst of
-  Nothing -> []
-  Just tree ->
-    (chooseFold scope) (\acc v -> if p v then (v:acc) else acc) [] tree
-search (fx:fs) p scope frst = case find (fx . rootLabel) frst of
-  Nothing -> []
-  Just tree -> search fs p scope (subForest tree)
+search :: [a -> Bool] -> (a -> Bool) -> SearchScope -> Forest a -> [[a]]
+search = searchP [] where
+  addIfPred p path acc (Node v _) = if p v then (v:path):acc else acc
+  searchBase = addIfPred
+  searchOne p path acc (Node v ts) = foldl (addIfPred p (v:path)) acc ts
+  searchSub p path acc tree = foldl
+    (searchSub p (rootLabel tree:path))
+    (searchBase p path acc tree) $
+    subForest tree
+  chooseSearch scope = case scope of
+    BaseObject -> searchBase
+    SingleLevel -> searchOne
+    WholeSubtree -> searchSub
+  searchP path [fx] p scope frst = case find (fx . rootLabel) frst of
+    Nothing -> []
+    Just tree -> (chooseSearch scope) p path [] tree
+  searchP path (fx:fs) p scope frst = case find (fx . rootLabel) frst of
+    Nothing -> []
+    Just (Node v ts) -> searchP (v:path) fs p scope ts
 
 modify :: [a -> Bool] -> (a -> a) -> Forest a -> Forest a
 modify [fx] f = matchingMap (fx . rootLabel) (\(Node v ts) -> Node (f v) ts)
