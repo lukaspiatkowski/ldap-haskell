@@ -16,28 +16,73 @@ import Encoding.LDAPDefs
 import Encoding.LDAPRead
 import Encoding.LDAPWrite
 
-bindUserResp :: LDAPMessage -> [Word8]
+import Internal.Api
+
+maybeAnd :: [Maybe Bool] -> Maybe Bool
+maybeAnd mb =
+    case all (\x -> x = Just True) mb of
+       True -> Just True
+       False ->
+           case any (\x -> x = Just False) of
+               True -> Just False
+               False -> Nothing
+
+maybeOr :: [Maybe Bool] -> Maybe Bool
+maybeOr mb =
+    case any (\x -> x = Just True) mb of
+       True -> Just True
+       False ->
+           case all (\x -> x = Just False) of
+               True -> Just False
+               False -> Nothing
+
+genFilter :: Filter -> [Attribute] -> Maybe Bool
+genFilter f =
+    case f of
+        And fl = (\x -> maybeAnd $ map (flip . genFilter $ x) fl
+        Or fl =  (\x -> maybeOr $ map (flip . genFilter $ x) fl
+        Not fil = not $ genFilter fil
+        EqualityMatch (attr, val) = \x -> Just $ any (\(a, vl) -> a == attr && any ((==) val) vl) x
+        SubstringsF sf = \x -> Nothing
+        GreaterOrEqual ava = \x -> Nothing
+        LessOrEqual ava = \x -> Nothing
+        Present (attr, val) = \x -> Just $ any (\(a, vl) -> a == attr) x
+        ApproxMatch = \x -> Nothing
+        ExtensibleMatch = \x -> Nothing
+
+filterGenerator :: Filter -> [Attribute] -> Bool
+filterGenerator f a =
+    case genFilter f a of
+         Nothng -> False
+         Just x -> x
+
+
+bindUserResp :: LDAPMessage -> LDAPMessage
 bindUserResp (id, BindRequest protV dn authCh, ctrls) = 
-    let f x = ldapToBer (id, BindResponse (x, dn, "", Nothing) Nothing, Nothing) in
+    let f x = (id, BindResponse (x, dn, "", Nothing) Nothing, Nothing) in
     case protV of
        3 -> f Success
        _ -> f ProtocolError
 
-searchResponse :: LDAPMessage -> [[Word8]]
-searchResponse (id, SearchRequest dn scope deref i1 i2 b filter attrs, ctrls) =
-   map ldapToBer [(id, SearchResultDone (Success, "", "", Nothing), Nothing)]
+searchResponse :: LDAPMessage -> LDAPInternalState -> [LDAPMessage]
+searchResponse (id, SearchRequest dn scope deref i1 i2 b filter attrs, ctrls) state =
+   let results = search dn scope (filterGenerator filter) state in
+   [(id, SearchResultDone (Success, "", "", Nothing), Nothing)]
 
-modifyResponse :: LDAPMessage -> [Word8]
+modifyResponse :: LDAPMessage -> (LDAPMessage, LDAPInternalState)
 modifyResponse (id, ModifyRequest dn opl, ctrls) =
-    ldapToBer (id, ModifyResponse (Success, "", "", Nothing), Nothing)
+    let ns = modify dn opl in
+    ((id, ModifyResponse (Success, "", "", Nothing), Nothing), ns)
 
-addResponse :: LDAPMessage -> [Word8]
+addResponse :: LDAPMessage -> (LDAPMessage, LDAPInternalState)
 addResponse (id, AddRequest entr attrs, ctrls) =
-    ldapToBer (id, AddResponse (Success, "", "", Nothing), Nothing)
+    let ns = add entr attrs in
+    ((id, AddResponse (Success, "", "", Nothing), Nothing), ns)
 
-delResponse :: LDAPMessage -> [Word8]
-delResponse (id, DelRequest dn, ctrls) = 
-    ldapToBer (id, DelResponse (Success, "", "", Nothing), Nothing)
+delResponse :: LDAPMessage -> (LDAPMessage, LDAPInternalState)
+delResponse (id, DelRequest dn, ctrls) =
+    let ns = remove dn in 
+    ((id, DelResponse (Success, "", "", Nothing), Nothing), ns)
 
 readMessage :: Handle -> BERMessage -> IO BERTree
 readMessage handle msg =
