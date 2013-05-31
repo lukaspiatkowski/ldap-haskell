@@ -55,3 +55,16 @@ rdnPredicate rdn p (Entry eRdn attrs) = rdn == eRdn &&
 
 attributesPredicate :: (AttributeList -> Bool) -> Entry -> Bool
 attributesPredicate p (Entry _ attrs) = p attrs
+
+attributeFunction :: (Operation, PartialAttribute) -> Entry -> Entry
+attributeFunction (op, (k, vs)) (Entry v attrs) = let
+    add :: String -> [String] -> [(String, [String])] -> [(String, [String])]
+    add k vs attrs = if any (mAK k) attrs then
+      map (\(key, vls) ->
+        (key, if key == k then vs `union` vls else vls)) attrs else
+      (k, vs):attrs
+    delete k = filter (not . mAK k)
+  in Entry v (case op of
+    Add -> add k vs attrs
+    Delete -> delete k attrs
+    Replace -> add k vs $ delete k attrs)

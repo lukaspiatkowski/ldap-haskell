@@ -1,6 +1,6 @@
-module LDAPInternalApi where
+module Internal.LDAPInternalApi where
 
-import Control.Monad.State
+import Control.Monad.State (put, get, return, runState, State)
 import Data.Tree
 import Encoding.LDAPDefs
 import Internal.Entry
@@ -33,7 +33,12 @@ remove dn = do
   put $ Tree.remove (dnListToFunctions $ reverse $ ldapDnToList dn) forest
 
 modify :: LDAPDN -> [(Operation, PartialAttribute)] -> LDAPInternalState ()
-modify = undefined
+modify dn ops = let
+    dnPredicates = dnListToFunctions $ reverse $ ldapDnToList dn
+    mods = map attributeFunction ops
+  in do
+    forest <- get
+    put $ foldl (\frst mod -> Tree.modify dnPredicates mod frst) forest mods
 
 search :: LDAPDN -> SearchScope -> (AttributeList -> Bool)
   -> LDAPInternalState [(LDAPDN, AttributeList)]
