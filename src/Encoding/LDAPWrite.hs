@@ -21,7 +21,7 @@ writeOperation (BindResponse result Nothing) =
     writeResultResp 1 result
 
 writeOperation (SearchResultEntry dn partialAttrs) =
-    ApplicationSpecific 5 [writeString dn, Sequence $ map writePartialAttr partialAttrs]
+    ApplicationSpecific 4 [writeString dn, Sequence $ map writePartialAttr partialAttrs]
 
 writeOperation (SearchResultDone result) =
     writeResultResp 5 result
