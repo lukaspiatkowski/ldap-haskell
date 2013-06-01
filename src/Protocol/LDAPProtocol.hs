@@ -15,7 +15,6 @@ import Encoding.LDAPWrite
 import Internal.LDAPInternalApi
 import Internal.Entry
 
-import Debug.Trace
 -- helper functions for transforming
 -- a Filter nto a function of type [Attribute] -> Bool
 maybeAnd :: [Maybe Bool] -> Maybe Bool
@@ -78,7 +77,7 @@ modifyResponse (id, ModifyRequest dn opl, ctrls) st =
 addResponse :: LDAPMessage -> Forest Entry -> (LDAPMessage, Forest Entry)
 addResponse (id, AddRequest entr attrs, ctrls) st =
     let ns = execState (add entr attrs) st in
-    trace ("add"++show ns) ((id, AddResponse (Success, "", "", Nothing), Nothing), ns)
+    ((id, AddResponse (Success, "", "", Nothing), Nothing), ns)
 
 delResponse :: LDAPMessage -> Forest Entry -> (LDAPMessage, Forest Entry)
 delResponse (id, DelRequest dn, ctrls) st =

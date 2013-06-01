@@ -11,13 +11,10 @@ import Protocol.LDAPProtocol
 loop socket state = do
     (handle, _, _) <- accept socket
     rstate <- loop_comm handle state
-    --print "end loop"
     loop socket rstate
     where
         loop_comm handle lstate = do
             intermediate_msg <- readMessage handle
-            --print $ show intermediate_msg
-            print $ show  intermediate_msg
             (continue, nstate) <- respondMsg handle lstate intermediate_msg
             if continue
                 then loop_comm handle nstate
@@ -55,7 +52,6 @@ getPort l = case l of
              [] -> 5002
 
 main = withSocketsDo $ do
-    --default port 636
     args <- getArgs >>= parse
     socket <- listenOn $ PortNumber $ toEnum $ getPort args 
     loop socket []
