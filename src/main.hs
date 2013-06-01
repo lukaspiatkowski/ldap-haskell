@@ -17,7 +17,7 @@ loop socket state = do
         loop_comm handle lstate = do
             intermediate_msg <- readMessage handle
             --print $ show intermediate_msg
-            print $ show $ intermediate_msg
+            print $ show  intermediate_msg
             (continue, nstate) <- respondMsg handle lstate intermediate_msg
             if continue
                 then loop_comm handle nstate
@@ -31,9 +31,9 @@ data Flag = ListenPort Int
           deriving (Show, Eq, Ord)
 
 flags = [
-         Option ['p'] [] (ReqArg (ListenPort . read) "PORT" )
+         Option "p" [] (ReqArg (ListenPort . read) "PORT" )
            "Set the port number(defult is 5002)"
-        ,Option ['h'] ["help"] (NoArg Help)
+        ,Option "h" ["help"] (NoArg Help)
            "Print this help message"
         ]
 

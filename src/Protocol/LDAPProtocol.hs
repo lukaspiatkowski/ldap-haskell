@@ -1,6 +1,7 @@
 module Protocol.LDAPProtocol where
 
 import Data.Tree
+import Data.Maybe
 import qualified Data.ByteString as DBS
 import Control.Monad
 import Control.Monad.State (evalState, execState)
@@ -18,22 +19,16 @@ import Debug.Trace
 -- helper functions for transforming
 -- a Filter nto a function of type [Attribute] -> Bool
 maybeAnd :: [Maybe Bool] -> Maybe Bool
-maybeAnd mb =
-    case all (\x -> x == Just True) mb of
-       True -> Just True
-       False ->
-           case any (\x -> x == Just False) mb of
-               True -> Just False
-               False -> Nothing
+maybeAnd mb 
+    | all (\x -> x == Just True) mb = Just True
+    | any (\x -> x == Just False) mb = Just False
+    | otherwise = Nothing
 
 maybeOr :: [Maybe Bool] -> Maybe Bool
-maybeOr mb =
-    case any (\x -> x == Just True) mb of
-       True -> Just True
-       False ->
-           case all (\x -> x == Just False) mb of
-               True -> Just False
-               False -> Nothing
+maybeOr mb 
+    | any (\x -> x == Just True) mb = Just True
+    | all (\x -> x == Just False) mb = Just False
+    | otherwise = Nothing
 
 maybeNot :: Maybe Bool -> Maybe Bool
 maybeNot Nothing = Nothing
@@ -43,22 +38,19 @@ genFilter :: Filter -> [Attribute] -> Maybe Bool
 genFilter f =
     let undef x = Nothing in
     case f of
-        And fl -> (\x -> maybeAnd $ map (flip genFilter x) fl)
-        Or fl ->  (\x -> maybeOr $ map (flip genFilter x) fl)
-        Not fil -> (\x -> maybeNot $ genFilter fil x)
-        EqualityMatch (attr, val) -> \x -> Just $ any (\(a, vl) -> a == attr && any ((==) val) vl) x
+        And fl -> \x -> maybeAnd $ map (`genFilter` x) fl
+        Or fl ->  \x -> maybeOr $ map (`genFilter` x) fl
+        Not fil -> maybeNot . genFilter fil
+        EqualityMatch (attr, val) -> Just . any (\(a, vl) -> a == attr && elem val vl)
         SubstringsF sf -> undef
         GreaterOrEqual ava -> undef
         LessOrEqual ava -> undef
-        Present attr -> \x -> Just $ any (\(a, vl) -> a == attr) x
+        Present attr -> Just . any (\(a, vl) -> a == attr)
         ApproxMatch ava -> undef
         ExtensibleMatch mra -> undef
 
 filterGenerator :: Filter -> [Attribute] -> Bool
-filterGenerator f a =
-    case genFilter f a of
-         Nothing -> False
-         Just x -> x
+filterGenerator f a = fromMaybe False (genFilter f a)
 
 -- handling specific LDAPMessages
 bindUserResp :: LDAPMessage -> LDAPMessage
@@ -76,7 +68,7 @@ searchResponse (id, SearchRequest dn scope deref i1 i2 b filter attrs, ctrls) f 
    let checkAttrs (en, attrlst) = mapper (en, attrlst) in
    let toMessage (en, attrlst) = (id, SearchResultEntry en attrlst, ctrls) in
    let resp_list = map (toMessage . checkAttrs) part_res in
-   (trace ("search" ++ show f) resp_list) ++ [(id, SearchResultDone (Success, "", "", Nothing), Nothing)]
+   resp_list ++ [(id, SearchResultDone (Success, "", "", Nothing), Nothing)]
 
 modifyResponse :: LDAPMessage -> Forest Entry -> (LDAPMessage, Forest Entry)
 modifyResponse (id, ModifyRequest dn opl, ctrls) st =
