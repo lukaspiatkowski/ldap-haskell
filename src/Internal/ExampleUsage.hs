@@ -9,8 +9,8 @@ main = let
       Just (_, vs) -> any (val==) vs
       Nothing -> False
     opers = [(Add, ("fn", ["Tam", "Sam"])), (Delete, ("sn", []))]
-  in do
-    putStrLn $ show $ fst $
+  in
+    print $ fst $
       runState (search "ou=mim,ou=uw" WholeSubtree (match "fn" "Sam")) $
       snd $ runState (modify "cn=Lukasz,ou=mim,ou=uw" opers) $
       snd $ runState (add "cn=Lukasz,ou=mim,ou=uw" [("sn", ["Piatkowski"])]) []

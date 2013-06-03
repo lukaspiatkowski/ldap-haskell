@@ -23,13 +23,13 @@ getAttribute key attrs = case find (mAK key) attrs of Just (_, value:_) -> value
 ldapDnToList :: LDAPDN -> [(String, String)]
 ldapDnToList = map (toPairOn '=') . splitOn ',' where
   splitOn c s = if any (c ==) s then
-    let (w, (_:s')) = break (c ==) s in w:splitOn c s' else
+    let (w, _:s') = break (c ==) s in w:splitOn c s' else
     [s]
-  toPairOn c s = let (w, (_:s')) = break (c ==) s in (w, s')
+  toPairOn c s = let (w, _:s') = break (c ==) s in (w, s')
 
 dnListToFunctions :: [(String, String)] -> [Entry -> Bool]
 dnListToFunctions = map crtMtchRdn where
-  crtMtchRdn (rdn, value) entry = rdnPredicate rdn (value==) entry
+  crtMtchRdn (rdn, value) = rdnPredicate rdn (value==)
 
 createEntry :: (String, String) -> AttributeList -> Entry
 createEntry (rdn, value) attrs = let
@@ -43,9 +43,9 @@ createEntry (rdn, value) attrs = let
 
 entryPathToString :: [Entry] -> (LDAPDN, AttributeList)
 entryPathToString entries =
-  (concat $ intersperse "," $ map entryRdnToString entries,
+  (intercalate "," $ map entryRdnToString entries,
   case entries of (Entry _ attrs:_) -> attrs) where
-    entryRdnToString (Entry rdn attrs) = rdn ++ ('=':(getAttribute rdn attrs))
+    entryRdnToString (Entry rdn attrs) = rdn ++ ('=':getAttribute rdn attrs)
 
 rdnPredicate :: String -> (String -> Bool) -> Entry -> Bool
 rdnPredicate rdn p (Entry eRdn attrs) = rdn == eRdn &&

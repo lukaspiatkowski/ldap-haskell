@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses,
-  FunctionalDependencies, RankNTypes #-}
+--{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, MultiParamTypeClasses,
+--  FunctionalDependencies, RankNTypes #-}
 module Internal.Tree where
 
 import Data.List
@@ -34,7 +34,7 @@ search = searchP [] where
     WholeSubtree -> searchSub
   searchP path [fx] p scope frst = case find (fx . rootLabel) frst of
     Nothing -> []
-    Just tree -> (chooseSearch scope) p path [] tree
+    Just tree -> chooseSearch scope p path [] tree
   searchP path (fx:fs) p scope frst = case find (fx . rootLabel) frst of
     Nothing -> []
     Just (Node v ts) -> searchP (v:path) fs p scope ts

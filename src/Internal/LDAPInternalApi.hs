@@ -38,7 +38,7 @@ modify dn ops = let
     mods = map attributeFunction ops
   in do
     forest <- get
-    put $ foldl (\frst mod -> Tree.modify dnPredicates mod frst) forest mods
+    put $ foldl (flip $ Tree.modify dnPredicates) forest mods
 
 search :: LDAPDN -> SearchScope -> (AttributeList -> Bool)
   -> LDAPInternalState [(LDAPDN, AttributeList)]
