@@ -62,8 +62,8 @@ buildProtocolOp' 8 (Sequence (obj:attrs:[])) = do
     return $ AddRequest baseObject attributes 
 
 -- del request
-buildProtocolOp' 10 (Sequence (obj:[])) = do
-    baseObject <- buildString obj
+buildProtocolOp' 10 (RawData (BERData dat) pc tag) = do
+    baseObject <- decodeString dat
     return $ DelRequest baseObject 
 
 --buildProtocolOp' 0 (Sequence )= 
