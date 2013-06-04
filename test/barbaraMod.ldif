@@ -1,0 +1,8 @@
+dn: cn=Barbara Jensen,dc=example,dc=com
+delete: sn
+-
+add: sn2
+sn2: Jensen
+-
+replace: sn2
+sn2: Jensen2
