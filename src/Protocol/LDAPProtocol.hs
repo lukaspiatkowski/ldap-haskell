@@ -122,11 +122,11 @@ messageGetter handle msg =
         Nothing -> do
             return $ buildTree msg
         Just x -> do
-            print $ show x
             msg_data <- DBS.hGet handle x
             messageGetter handle $ BERData $ berData msg ++ DBS.unpack msg_data
 
 readMessage :: Handle -> IO (Either String LDAPMessage)
 readMessage handle = do
     msg <- messageGetter handle newMessage
+    print $ show $ buildLDAP msg
     return $ buildLDAP msg
