@@ -90,46 +90,40 @@ decodeString :: [Word8] -> ParseT String
 decodeString str = return $ Codec.decode str
 
 buildFilter :: BERTree -> ParseT Filter
-buildFilter (ContextNode 0 rawData) = do
-    case buildTree $ BERData rawData of
-        (SetOf dat) -> do
-            filters <- forM (dat) buildFilter
-            return $ And filters
-        _ -> Left "Got unexpected type instead AND set"
+buildFilter (ChoiceNode 0 subtree) = do
+    filters <- forM (subtree) buildFilter
+    return $ And filters
 
-buildFilter (ContextNode 1 rawData) = do
-    case buildTree $ BERData rawData of
-        (SetOf dat) -> do
-            filters <- forM dat buildFilter
-            return $ Or filters
-        _ -> Left "Got unexpected type instead OR set"
+buildFilter (ChoiceNode 1 subtree) = do
+    filters <- forM subtree buildFilter
+    return $ Or filters
 
 buildFilter (ChoiceNode 2 (subtree:[])) = do
-    filter <- buildFilter subtree
+    filter <- buildFilter $ subtree
     return $ Not filter
 
-buildFilter (ChoiceNode 3 (subtree:[])) = do
-    attr <- buildAttrValAssert subtree
+buildFilter (ChoiceNode 3 (subtree)) = do
+    attr <- buildAttrValAssert $ Sequence subtree
     return $ EqualityMatch attr
 
-buildFilter (ChoiceNode 4 (subtree:[])) = do
-    substrF <- buildSubstrFilter subtree
+buildFilter (ChoiceNode 4 (subtree)) = do
+    substrF <- buildSubstrFilter $ Sequence subtree
     return $ SubstringsF substrF
 
-buildFilter (ChoiceNode 5 (subtree:[])) = do
-    attr <- buildAttrValAssert subtree
+buildFilter (ChoiceNode 5 (subtree)) = do
+    attr <- buildAttrValAssert $ Sequence subtree
     return $ GreaterOrEqual attr
 
-buildFilter (ChoiceNode 6 (subtree:[])) = do
-    attr <- buildAttrValAssert subtree
+buildFilter (ChoiceNode 6 (subtree)) = do
+    attr <- buildAttrValAssert $ Sequence subtree
     return $ LessOrEqual attr
 
 buildFilter (ContextNode 7 subtree) = do
     attr <- decodeString subtree
     return $ Present attr
 
-buildFilter (ChoiceNode 8 (subtree:[])) = do
-    attr <- buildAttrValAssert subtree
+buildFilter (ChoiceNode 8 (subtree)) = do
+    attr <- buildAttrValAssert $ Sequence subtree
     return $ ApproxMatch attr
 
 -- TODO
@@ -137,7 +131,7 @@ buildFilter (ChoiceNode 8 (subtree:[])) = do
 --    attr <- buildMatchRuleAssert subtree
 --    return $ ExtensibleMatch attr
 
-buildFilter _ = Left "Expected filter choice"
+buildFilter _ = Left "Expected filter choice got"
 
 
 buildAttrValAssert :: BERTree -> ParseT AttributeValueAssertion

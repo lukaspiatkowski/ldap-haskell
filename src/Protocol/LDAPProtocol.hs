@@ -102,7 +102,9 @@ constructResp ldap_msg@(id, op, ctrls) state =
 respondMsg :: Handle -> Forest Entry -> Either String LDAPMessage -> IO (Bool, Forest Entry)
 respondMsg handle state ldap_msg =
     case ldap_msg of
-        Left s -> return (True, state)
+        Left s -> do
+            print $ "Server encounter error: " ++ s
+            return (True, state)
         Right msg -> case constructResp msg state of
                (Nothing, nst) -> return (False, nst)
                (Just msg_data, nst) -> do
@@ -117,8 +119,10 @@ respondMsg handle state ldap_msg =
 messageGetter :: Handle -> BERMessage -> IO BERTree
 messageGetter handle msg =
     case sizeLeft msg of
-        Nothing -> return $ buildTree msg
+        Nothing -> do
+            return $ buildTree msg
         Just x -> do
+            print $ show x
             msg_data <- DBS.hGet handle x
             messageGetter handle $ BERData $ berData msg ++ DBS.unpack msg_data
 
